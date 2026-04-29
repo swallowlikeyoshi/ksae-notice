@@ -1,0 +1,1 @@
+ALTER TABLE `email_logs` ADD `batch_id` text;

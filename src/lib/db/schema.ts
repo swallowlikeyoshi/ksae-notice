@@ -54,6 +54,7 @@ export const emailLogs = sqliteTable('email_logs', {
     .notNull()
     .references(() => users.id),
   postId: integer('post_id'),
+  batchId: text('batch_id'),
   type: text('type').notNull(),
   status: text('status').notNull(),
   error: text('error'),

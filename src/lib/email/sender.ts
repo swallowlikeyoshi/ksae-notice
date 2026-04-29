@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { eq, and, sql, gte, isNull } from 'drizzle-orm';
 import { getDb } from '../db';
 import { users, subscriptions, emailLogs, settings } from '../db/schema';
@@ -99,11 +100,14 @@ export async function notifyNewPosts(newPosts: NewPost[]): Promise<void> {
     return;
   }
 
+  const batchId = randomUUID();
+
   if (remaining < recipientCount) {
     console.warn(`[Email] Brevo remaining credits (${remaining}) < recipients (${recipientCount}), skipping all notifications`);
     for (const [userId] of userPosts) {
       db.insert(emailLogs).values({
         userId,
+        batchId,
         type: 'notification',
         status: 'failed',
         error: `Insufficient Brevo credits: ${remaining} remaining, ${recipientCount} needed`,
@@ -112,16 +116,16 @@ export async function notifyNewPosts(newPosts: NewPost[]): Promise<void> {
     return;
   }
 
-  // Get per-user daily email limit
+  // Get per-user daily email limit (counted in distinct emails sent, not posts)
   const maxPerUserSetting = db.select().from(settings).where(eq(settings.key, 'maxEmailsPerUserPerDay')).get();
   const maxEmailsPerUserPerDay = parseInt(maxPerUserSetting?.value || '2', 10);
   const today = new Date().toISOString().slice(0, 10);
 
   // Send one email per user
   for (const [userId, userData] of userPosts) {
-    // Check per-user daily email limit
+    // Count distinct emails sent today (one batch_id per email)
     const todaySentCount = db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${emailLogs.batchId})` })
       .from(emailLogs)
       .where(and(eq(emailLogs.userId, userId), eq(emailLogs.status, 'sent'), gte(emailLogs.sentAt, today)))
       .get();
@@ -131,6 +135,7 @@ export async function notifyNewPosts(newPosts: NewPost[]): Promise<void> {
         db.insert(emailLogs).values({
           userId,
           postId: post.id,
+          batchId,
           type: 'notification',
           status: 'skipped',
           error: `Daily per-user limit reached: ${maxEmailsPerUserPerDay}`,
@@ -165,11 +170,12 @@ export async function notifyNewPosts(newPosts: NewPost[]): Promise<void> {
         htmlContent,
       });
 
-      // Log success for each post
+      // Log success for each post (shared batchId identifies the single email)
       for (const post of userData.posts) {
         db.insert(emailLogs).values({
           userId,
           postId: post.id,
+          batchId,
           type: 'notification',
           status: 'sent',
         }).run();
@@ -180,6 +186,7 @@ export async function notifyNewPosts(newPosts: NewPost[]): Promise<void> {
       const errMsg = error instanceof Error ? error.message : String(error);
       db.insert(emailLogs).values({
         userId,
+        batchId,
         type: 'notification',
         status: 'failed',
         error: errMsg,

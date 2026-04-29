@@ -48,6 +48,7 @@ export function createTestDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id),
       post_id INTEGER,
+      batch_id TEXT,
       type TEXT NOT NULL,
       status TEXT NOT NULL,
       error TEXT,
