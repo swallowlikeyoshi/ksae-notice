@@ -12,7 +12,7 @@ export default function LoginButton() {
     return (
       <div className="flex items-center gap-1">
         <a
-          href="https://github.com/luftaquila/ksae-notice"
+          href="https://github.com/swallowlikeyoshi/ksae-notice"
           target="_blank"
           rel="noopener noreferrer"
           className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 active:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 dark:active:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition"
