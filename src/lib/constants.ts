@@ -1,18 +1,71 @@
+// Competitions (top-level grouping shown as tabs)
+export const COMPETITIONS = [
+  { id: 'ksae', label: '영광(KSAE)' },
+  { id: 'hwaseong', label: '화성 대회' },
+] as const;
+
+export type CompetitionId = (typeof COMPETITIONS)[number]['id'];
+
+// Board sources (each has its own fetch URL scheme + HTML parser)
+export type BoardSource = 'ksae' | 'carsa';
+
 export const BOARDS = [
+  // 영광(KSAE) — https://www.ksae.org/jajak
   {
     type: 'notice',
+    competition: 'ksae',
+    source: 'ksae',
     code: 'J_notice',
     baseUrl: 'https://www.ksae.org/jajak/bbs/index.php',
   },
   {
     type: 'rule',
+    competition: 'ksae',
+    source: 'ksae',
     code: 'J_rule',
     baseUrl: 'https://www.ksae.org/jajak/bbs/index.php',
+  },
+  // 화성 대회 (한국자동차안전학회) — https://carsa.kr
+  {
+    type: 'hs_notice',
+    competition: 'hwaseong',
+    source: 'carsa',
+    code: 's6_1',
+    label: '공지사항',
+    baseUrl: 'https://carsa.kr/bbs/board.php',
+  },
+  {
+    type: 'hs_data',
+    competition: 'hwaseong',
+    source: 'carsa',
+    code: 's6_2',
+    label: '자료실',
+    baseUrl: 'https://carsa.kr/bbs/board.php',
+  },
+  {
+    type: 'hs_qna',
+    competition: 'hwaseong',
+    source: 'carsa',
+    code: 's6_6',
+    label: 'QnA',
+    baseUrl: 'https://carsa.kr/bbs/board.php',
   },
 ] as const;
 
 export type BoardType = (typeof BOARDS)[number]['type'];
 
+// boardType -> competition
+export const BOARDTYPE_TO_COMPETITION = Object.fromEntries(
+  BOARDS.map((b) => [b.type, b.competition]),
+) as Record<BoardType, CompetitionId>;
+
+// competition -> its boardTypes
+export const COMPETITION_BOARDTYPES = COMPETITIONS.reduce((acc, c) => {
+  acc[c.id] = BOARDS.filter((b) => b.competition === c.id).map((b) => b.type);
+  return acc;
+}, {} as Record<CompetitionId, BoardType[]>);
+
+// KSAE notice board internal category codes
 export const NOTICE_CATEGORIES: Record<string, string> = {
   Z: '공통',
   A: 'Baja',
@@ -27,13 +80,35 @@ export const NOTICE_CATEGORY_CODES: Record<string, string> = Object.fromEntries(
 );
 
 export const SUBSCRIPTION_CATEGORIES = [
-  { id: 'notice_Z', label: '공지 - 공통' },
-  { id: 'notice_A', label: '공지 - Baja' },
-  { id: 'notice_B', label: '공지 - Formula' },
-  { id: 'notice_C', label: '공지 - EV' },
-  { id: 'notice_D', label: '공지 - 자율주행' },
-  { id: 'rule', label: '규정' },
+  // 영광(KSAE)
+  { id: 'notice_Z', label: '공통', competition: 'ksae' },
+  { id: 'notice_A', label: 'Baja', competition: 'ksae' },
+  { id: 'notice_B', label: 'Formula', competition: 'ksae' },
+  { id: 'notice_C', label: 'EV', competition: 'ksae' },
+  { id: 'notice_D', label: '자율주행', competition: 'ksae' },
+  { id: 'rule', label: '규정', competition: 'ksae' },
+  // 화성 대회
+  { id: 'hs_notice', label: '공지사항', competition: 'hwaseong' },
+  { id: 'hs_data', label: '자료실', competition: 'hwaseong' },
+  { id: 'hs_qna', label: 'QnA', competition: 'hwaseong' },
 ] as const;
+
+// Category chips available per competition on the post list
+export const COMPETITION_CATEGORY_CHIPS: Record<CompetitionId, { id: string; label: string }[]> = {
+  ksae: [
+    { id: '공통', label: '공통' },
+    { id: 'Baja', label: 'Baja' },
+    { id: 'Formula', label: 'Formula' },
+    { id: 'EV', label: 'EV' },
+    { id: '자율주행', label: '자율주행' },
+    { id: '규정', label: '규정' },
+  ],
+  hwaseong: [
+    { id: '공지사항', label: '공지사항' },
+    { id: '자료실', label: '자료실' },
+    { id: 'QnA', label: 'QnA' },
+  ],
+};
 
 export function getEndOfYear(): string {
   return `${new Date().getFullYear()}-12-31T23:59:59.000Z`;
@@ -88,9 +163,33 @@ export const CATEGORY_COLORS: Record<string, {
     filterInactive: 'bg-green-50 text-green-600 hover:bg-green-100 active:bg-green-100 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20 dark:active:bg-green-500/20',
     email: { bg: '#dcfce7', text: '#15803d' },
   },
+  // 화성 대회 (carsa) board tags
+  '공지사항': {
+    chip: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400',
+    chipHover: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 active:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:hover:bg-indigo-500/30 dark:active:bg-indigo-500/30',
+    filterActive: 'bg-indigo-600 text-white',
+    filterInactive: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 active:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 dark:active:bg-indigo-500/20',
+    email: { bg: '#e0e7ff', text: '#4338ca' },
+  },
+  '자료실': {
+    chip: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-400',
+    chipHover: 'bg-teal-100 text-teal-700 hover:bg-teal-200 active:bg-teal-200 dark:bg-teal-500/20 dark:text-teal-400 dark:hover:bg-teal-500/30 dark:active:bg-teal-500/30',
+    filterActive: 'bg-teal-600 text-white',
+    filterInactive: 'bg-teal-50 text-teal-600 hover:bg-teal-100 active:bg-teal-100 dark:bg-teal-500/10 dark:text-teal-400 dark:hover:bg-teal-500/20 dark:active:bg-teal-500/20',
+    email: { bg: '#ccfbf1', text: '#0f766e' },
+  },
+  'QnA': {
+    chip: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
+    chipHover: 'bg-amber-100 text-amber-700 hover:bg-amber-200 active:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/30 dark:active:bg-amber-500/30',
+    filterActive: 'bg-amber-500 text-white',
+    filterInactive: 'bg-amber-50 text-amber-600 hover:bg-amber-100 active:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20 dark:active:bg-amber-500/20',
+    email: { bg: '#fef3c7', text: '#b45309' },
+  },
 };
 
 export function getCategoryLabel(subscriptionId: string): string {
+  const found = SUBSCRIPTION_CATEGORIES.find((c) => c.id === subscriptionId);
+  if (found) return found.label;
   if (subscriptionId === 'rule') return '규정';
   const code = subscriptionId.replace('notice_', '');
   return NOTICE_CATEGORIES[code] || subscriptionId;

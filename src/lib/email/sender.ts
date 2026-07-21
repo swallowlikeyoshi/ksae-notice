@@ -19,10 +19,15 @@ interface NewPost {
 }
 
 function getSubscriptionCategory(post: NewPost): string | null {
+  // 화성 대회 (carsa): subscription id == boardType
+  if (post.boardType === 'hs_notice' || post.boardType === 'hs_data' || post.boardType === 'hs_qna') {
+    return post.boardType;
+  }
+  // 영광(KSAE) 규정
   if (post.boardType === 'rule') {
     return 'rule';
   }
-  // For notice board, map category label to subscription ID
+  // 영광(KSAE) 공지: map category label to subscription ID
   if (post.category) {
     const code = NOTICE_CATEGORY_CODES[post.category];
     if (code) return `notice_${code}`;

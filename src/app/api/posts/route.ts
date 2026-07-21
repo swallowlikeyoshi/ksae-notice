@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq, desc, asc, and, or, sql, inArray, isNull } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { posts } from '@/lib/db/schema';
+import { COMPETITION_BOARDTYPES, type CompetitionId } from '@/lib/constants';
 
 function escapeLike(s: string): string {
   return s.replace(/!/g, '!!').replace(/%/g, '!%').replace(/_/g, '!_');
@@ -18,14 +19,31 @@ export async function GET(request: NextRequest) {
   const limit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '20', 10) || 20, 100));
   const search = searchParams.get('search');
 
+  // Competition scope (defaults to 영광/KSAE for backward compatibility)
+  const competitionParam = searchParams.get('competition');
+  const competition: CompetitionId = competitionParam === 'hwaseong' ? 'hwaseong' : 'ksae';
+  const boardTypes = COMPETITION_BOARDTYPES[competition];
+
   const db = getDb();
 
   const conditions = [];
 
-  if (categoriesParam) {
+  // Always scope to the competition's boards
+  conditions.push(inArray(posts.boardType, boardTypes));
+
+  if (competition === 'hwaseong') {
+    // carsa boards: category chips == board labels (공지사항/자료실/QnA), stored in posts.category
+    if (categoriesParam) {
+      const cats = categoriesParam.split(',').filter(Boolean);
+      if (cats.length > 0) conditions.push(inArray(posts.category, cats));
+    } else if (category) {
+      conditions.push(eq(posts.category, category));
+    }
+  } else if (categoriesParam) {
+    // 영광(KSAE): 규정 -> rule board, 공통 -> notice with null category
     const cats = categoriesParam.split(',').filter(Boolean);
     const hasRule = cats.includes('규정');
-    const noticeCats = cats.filter(c => c !== '규정');
+    const noticeCats = cats.filter((c) => c !== '규정');
 
     const orConds = [];
     if (noticeCats.length > 0) {
@@ -54,7 +72,7 @@ export async function GET(request: NextRequest) {
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  // pinnedFirst: pinned DESC → boardType ASC (notice before rule) → date DESC
+  // pinnedFirst: pinned DESC → boardType ASC → date DESC
   const order = pinnedFirst
     ? [desc(posts.isPinned), asc(posts.boardType), desc(posts.date), desc(posts.postNumber)]
     : [desc(posts.date), desc(posts.postNumber)];

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PostTable from '@/components/PostTable';
+import { COMPETITIONS, type CompetitionId } from '@/lib/constants';
 
 interface Stats {
   activeSubscribers: number;
@@ -29,6 +30,12 @@ function getTickInterval(dateStr: string): number {
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [tick, setTick] = useState(0);
+  const [competition, setCompetition] = useState<CompetitionId>('ksae');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('competition');
+    if (saved === 'ksae' || saved === 'hwaseong') setCompetition(saved);
+  }, []);
 
   useEffect(() => {
     fetch('/api/stats')
@@ -90,8 +97,28 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Competition tabs */}
+      <div className="flex gap-1 mt-2 mb-1 border-b border-gray-200 dark:border-gray-800">
+        {COMPETITIONS.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => {
+              setCompetition(c.id);
+              localStorage.setItem('competition', c.id);
+            }}
+            className={`px-4 py-2.5 -mb-px text-sm font-medium border-b-2 transition cursor-pointer focus-visible:outline-none ${
+              competition === c.id
+                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       {/* Post list */}
-      <PostTable />
+      <PostTable competition={competition} />
     </div>
   );
 }

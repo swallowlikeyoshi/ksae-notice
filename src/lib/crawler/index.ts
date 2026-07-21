@@ -29,11 +29,16 @@ function finishCrawlLog(db: ReturnType<typeof getDb>, logId: bigint | number, st
     .run();
 }
 
-async function fetchPage(boardCode: string, page: number): Promise<string> {
-  const url = `https://www.ksae.org/jajak/bbs/index.php?page=${page}&code=${boardCode}`;
+type Board = (typeof BOARDS)[number];
+
+async function fetchPage(board: Board, page: number): Promise<string> {
+  const url = board.source === 'carsa'
+    ? `${board.baseUrl}?bo_table=${board.code}&page=${page}`
+    : `${board.baseUrl}?page=${page}&code=${board.code}`;
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KSAE-Notice-Bot/1.0)' },
-    dispatcher: tlsAgent,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Notice-Bot/1.0)' },
+    // KSAE server uses weak DH params; carsa uses standard TLS (default dispatcher)
+    ...(board.source === 'ksae' ? { dispatcher: tlsAgent } : {}),
   } as any);
   if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
   return res.text();
@@ -104,8 +109,8 @@ export async function crawlAll(): Promise<void> {
       let page = 1;
 
       while (true) {
-        const html = await fetchPage(board.code, page);
-        const pagePosts = parseBoardPage(html, board.type);
+        const html = await fetchPage(board, page);
+        const pagePosts = parseBoardPage(html, board);
 
         // No posts found (or only pinned on subsequent pages) → done
         const nonPinned = pagePosts.filter((p) => !p.isPinned);
@@ -144,8 +149,8 @@ export async function crawlLatest(): Promise<ParsedPost[]> {
     const logId = startCrawlLog(db, board.type);
 
     try {
-      const html = await fetchPage(board.code, 1);
-      const pagePosts = parseBoardPage(html, board.type);
+      const html = await fetchPage(board, 1);
+      const pagePosts = parseBoardPage(html, board);
       let newCount = 0;
 
       for (const post of pagePosts) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { CATEGORY_COLORS } from '@/lib/constants';
+import { CATEGORY_COLORS, COMPETITION_CATEGORY_CHIPS, type CompetitionId } from '@/lib/constants';
 import CategoryFilter from './CategoryFilter';
 
 interface Post {
@@ -15,18 +15,13 @@ interface Post {
   url: string;
 }
 
-const ALL_CATEGORIES = [
-  { id: '공통', label: '공통' },
-  { id: 'Baja', label: 'Baja' },
-  { id: 'Formula', label: 'Formula' },
-  { id: 'EV', label: 'EV' },
-  { id: '자율주행', label: '자율주행' },
-  { id: '규정', label: '규정' },
-];
-
-function getMobileUrl(post: Post): string {
-  const code = post.boardType === 'notice' ? 'J_notice' : 'J_rule';
-  return `https://www.ksae.org/jajak/mobile/bbs/view.php?number=${post.postNumber}&page=1&code=${code}`;
+// KSAE boards have a dedicated mobile view; carsa boards use the stored url as-is.
+function getViewUrl(post: Post, isMobile: boolean): string {
+  if (isMobile && (post.boardType === 'notice' || post.boardType === 'rule')) {
+    const code = post.boardType === 'notice' ? 'J_notice' : 'J_rule';
+    return `https://www.ksae.org/jajak/mobile/bbs/view.php?number=${post.postNumber}&page=1&code=${code}`;
+  }
+  return post.url;
 }
 
 function useIsMobile() {
@@ -40,7 +35,8 @@ function useIsMobile() {
   return isMobile;
 }
 
-export default function PostTable() {
+export default function PostTable({ competition }: { competition: CompetitionId }) {
+  const categoryChips = COMPETITION_CATEGORY_CHIPS[competition];
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -67,6 +63,8 @@ export default function PostTable() {
     if (isInitialLoad.current) setLoading(true);
     const params = new URLSearchParams();
 
+    params.set('competition', competition);
+
     if (selectedCategories.length > 0) {
       params.set('categories', selectedCategories.join(','));
     }
@@ -88,7 +86,7 @@ export default function PostTable() {
       setLoading(false);
       isInitialLoad.current = false;
     }
-  }, [selectedCategories, search, page, perPage, pinnedFirst]);
+  }, [competition, selectedCategories, search, page, perPage, pinnedFirst]);
 
   useEffect(() => {
     fetchPosts();
@@ -97,6 +95,12 @@ export default function PostTable() {
   useEffect(() => {
     setPage(1);
   }, [selectedCategories, search, perPage, pinnedFirst]);
+
+  // Reset filters when switching competition tabs
+  useEffect(() => {
+    setSelectedCategories([]);
+    setPage(1);
+  }, [competition]);
 
   const handleSearchInput = (value: string) => {
     setSearchInput(value);
@@ -110,7 +114,7 @@ export default function PostTable() {
       {/* Category filter */}
       <div className="mb-3">
         <CategoryFilter
-          categories={ALL_CATEGORIES}
+          categories={categoryChips}
           selected={selectedCategories}
           onChange={setSelectedCategories}
         />
@@ -170,7 +174,7 @@ export default function PostTable() {
                     key={`${post.boardType}-${post.postNumber}`}
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest('a')) return;
-                      window.open(isMobile ? getMobileUrl(post) : post.url, '_blank', 'noopener,noreferrer');
+                      window.open(getViewUrl(post, isMobile), '_blank', 'noopener,noreferrer');
                     }}
                     className="group hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-50 dark:active:bg-gray-800 transition cursor-pointer"
                   >
@@ -181,7 +185,7 @@ export default function PostTable() {
                     </td>
                     <td className="px-2 py-3">
                       <a
-                        href={isMobile ? getMobileUrl(post) : post.url}
+                        href={getViewUrl(post, isMobile)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 active:text-blue-600 dark:active:text-blue-400 group-active:text-blue-600 dark:group-active:text-blue-400 transition"

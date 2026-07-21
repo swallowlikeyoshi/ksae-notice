@@ -148,7 +148,7 @@ describe('PATCH /api/admin/users', () => {
     expect((await res.json()).ok).toBe(true);
 
     const subs = db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).all();
-    expect(subs.length).toBe(6); // 5 notice + 1 rule
+    expect(subs.length).toBe(9); // 영광: 5 notice + 1 rule / 화성: 3 boards
     expect(subs.every(s => s.isActive === 1)).toBe(true);
   });
 

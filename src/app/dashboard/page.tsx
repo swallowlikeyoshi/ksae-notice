@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { SUBSCRIPTION_CATEGORIES } from '@/lib/constants';
+import { SUBSCRIPTION_CATEGORIES, COMPETITIONS, type CompetitionId } from '@/lib/constants';
 import ToggleSwitch from '@/components/ToggleSwitch';
 
 interface Subscription {
@@ -19,6 +19,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [competition, setCompetition] = useState<CompetitionId>('ksae');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('competition');
+    if (saved === 'ksae' || saved === 'hwaseong') setCompetition(saved);
+  }, []);
+
+  const tabCategories = SUBSCRIPTION_CATEGORIES.filter((c) => c.competition === competition);
 
   const fetchSubs = async () => {
     try {
@@ -41,7 +49,7 @@ export default function DashboardPage() {
     setError(null);
     try {
       let hasError = false;
-      for (const cat of SUBSCRIPTION_CATEGORIES) {
+      for (const cat of tabCategories) {
         const sub = subs.find((s) => s.category === cat.id);
         if (!sub?.isActive) {
           const res = await fetch('/api/subscriptions', {
@@ -62,12 +70,13 @@ export default function DashboardPage() {
   };
 
   const unsubscribeAll = async () => {
-    if (!confirm('모든 카테고리의 구독을 해제하시겠습니까?')) return;
+    const compLabel = COMPETITIONS.find((c) => c.id === competition)?.label ?? '';
+    if (!confirm(`${compLabel}의 모든 카테고리 구독을 해제하시겠습니까?`)) return;
     setActionLoading('unsubscribe_all');
     setError(null);
     try {
       let hasError = false;
-      for (const cat of SUBSCRIPTION_CATEGORIES) {
+      for (const cat of tabCategories) {
         const sub = subs.find((s) => s.category === cat.id);
         if (sub?.isActive) {
           const res = await fetch('/api/subscriptions', {
@@ -161,6 +170,10 @@ export default function DashboardPage() {
   const expiresAt = subs.find((s) => s.isActive)?.expiresAt;
   const isExpired = expiresAt ? new Date(expiresAt) < now : false;
   const showRenewal = hasActiveSubs && (isDecember || isExpired);
+  // Whether the currently-shown competition tab has any active subscription
+  const tabHasActive = tabCategories.some(
+    (cat) => subs.find((s) => s.category === cat.id)?.isActive === 1,
+  );
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -196,9 +209,29 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Competition tabs */}
+      <div className="flex gap-1 mb-3 border-b border-gray-200 dark:border-gray-800">
+        {COMPETITIONS.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => {
+              setCompetition(c.id);
+              localStorage.setItem('competition', c.id);
+            }}
+            className={`px-4 py-2.5 -mb-px text-sm font-medium border-b-2 transition cursor-pointer focus-visible:outline-none ${
+              competition === c.id
+                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       {/* Subscription toggles */}
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
-        {SUBSCRIPTION_CATEGORIES.map((cat) => {
+        {tabCategories.map((cat) => {
           const sub = subs.find((s) => s.category === cat.id);
           const isActive = sub?.isActive === 1;
 
@@ -207,7 +240,7 @@ export default function DashboardPage() {
               key={cat.id}
               className="flex items-center justify-between px-4 py-3"
             >
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{cat.label.replace('공지 - ', '')}</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{cat.label}</div>
               <ToggleSwitch
                 checked={isActive}
                 onChange={() => toggleSubscription(cat.id, isActive)}
@@ -219,7 +252,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-4 text-center">
-        {!hasActiveSubs ? (
+        {!tabHasActive ? (
           <button
             onClick={subscribeAll}
             disabled={actionLoading === 'subscribe_all'}
